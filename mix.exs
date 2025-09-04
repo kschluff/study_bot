@@ -65,7 +65,15 @@ defmodule StudyBot.MixProject do
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      # RAG and AI dependencies
+      {:openai, "~> 0.6"},
+      {:nx, "~> 0.7"},
+      {:scholar, "~> 0.3"},
+      # File processing
+      {:temp, "~> 0.4"},
+      # UUID generation
+      {:uuid, "~> 1.1"}
     ]
   end
 
