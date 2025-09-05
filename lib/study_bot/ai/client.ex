@@ -4,7 +4,8 @@ defmodule StudyBot.AI.Client do
   The provider is selected at compile time via application configuration.
   """
 
-  @callback chat_completion(messages :: list(), opts :: map()) :: {:ok, String.t()} | {:error, any()}
+  @callback chat_completion(messages :: list(), opts :: map()) ::
+              {:ok, String.t()} | {:error, any()}
   @callback generate_embedding(text :: String.t()) :: {:ok, list()} | {:error, any()}
   @callback get_embedding_model() :: String.t()
   @callback get_embedding_dimensions() :: integer()

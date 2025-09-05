@@ -8,8 +8,10 @@ defmodule StudyBotWeb.DocumentController do
       %Documents.Document{} = document when document.status == "processed" ->
         conn
         |> put_resp_content_type("text/plain")
-        |> put_resp_header("content-disposition", 
-           "attachment; filename=\"#{document.original_filename}\"")
+        |> put_resp_header(
+          "content-disposition",
+          "attachment; filename=\"#{document.original_filename}\""
+        )
         |> send_resp(200, document.content || "")
 
       %Documents.Document{} = document ->

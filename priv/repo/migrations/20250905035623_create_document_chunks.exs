@@ -4,7 +4,10 @@ defmodule StudyBot.Repo.Migrations.CreateDocumentChunks do
   def change do
     create table(:document_chunks, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :document_id, references(:documents, on_delete: :delete_all, type: :binary_id), null: false
+
+      add :document_id, references(:documents, on_delete: :delete_all, type: :binary_id),
+        null: false
+
       add :course_id, references(:courses, on_delete: :delete_all, type: :binary_id), null: false
       add :chunk_index, :integer, null: false
       add :content, :text, null: false

@@ -6,13 +6,17 @@ defmodule StudyBot.Documents do
   import Ecto.Query, warn: false
   alias StudyBot.Repo
   alias StudyBot.Documents.{Document, DocumentChunk}
+  alias StudyBot.{VectorStore, AI.Client}
+
+  require Logger
 
   # Document operations
 
   def list_documents(course_id) do
-    from(d in Document, 
-         where: d.course_id == ^course_id,
-         order_by: [desc: d.inserted_at])
+    from(d in Document,
+      where: d.course_id == ^course_id,
+      order_by: [desc: d.inserted_at]
+    )
     |> Repo.all()
   end
 
@@ -51,6 +55,9 @@ defmodule StudyBot.Documents do
   end
 
   def delete_document(%Document{} = document) do
+    # Delete from vector store first
+    VectorStore.delete_document(document.course_id, document.id)
+    # Then delete from SQLite
     Repo.delete(document)
   end
 
@@ -58,8 +65,9 @@ defmodule StudyBot.Documents do
 
   def list_chunks(document_id) do
     from(c in DocumentChunk,
-         where: c.document_id == ^document_id,
-         order_by: [asc: c.chunk_index])
+      where: c.document_id == ^document_id,
+      order_by: [asc: c.chunk_index]
+    )
     |> Repo.all()
   end
 
@@ -90,7 +98,7 @@ defmodule StudyBot.Documents do
     |> Enum.map(fn {content, index} ->
       start_char = calculate_start_char(text, content, index)
       end_char = start_char + String.length(content) - 1
-      
+
       %{
         chunk_index: index,
         content: String.trim(content),
@@ -114,7 +122,8 @@ defmodule StudyBot.Documents do
     Enum.reverse(acc)
   end
 
-  defp create_overlapping_chunks(words, chunk_size, _overlap, acc) when length(words) <= chunk_size do
+  defp create_overlapping_chunks(words, chunk_size, _overlap, acc)
+       when length(words) <= chunk_size do
     chunk = Enum.join(words, " ")
     Enum.reverse([chunk | acc])
   end
@@ -122,10 +131,10 @@ defmodule StudyBot.Documents do
   defp create_overlapping_chunks(words, chunk_size, overlap, acc) do
     {chunk_words, _remaining} = Enum.split(words, chunk_size)
     chunk = Enum.join(chunk_words, " ")
-    
+
     next_start = max(0, chunk_size - overlap)
     {_skip, next_words} = Enum.split(words, next_start)
-    
+
     create_overlapping_chunks(next_words, chunk_size, overlap, [chunk | acc])
   end
 
@@ -135,7 +144,8 @@ defmodule StudyBot.Documents do
     else
       case String.split(full_text, chunk_content, parts: 2) do
         [prefix, _] -> String.length(prefix)
-        _ -> index * 400  # fallback estimation
+        # fallback estimation
+        _ -> index * 400
       end
     end
   end
@@ -153,18 +163,18 @@ defmodule StudyBot.Documents do
     filename = generate_filename(original_filename)
 
     case create_document(%{
-      course_id: course_id,
-      filename: filename,
-      original_filename: original_filename,
-      file_type: file_type,
-      file_size: file_size
-    }) do
+           course_id: course_id,
+           filename: filename,
+           original_filename: original_filename,
+           file_type: file_type,
+           file_size: file_size
+         }) do
       {:ok, document} ->
         Task.start(fn -> process_document_async(document, file_path) end)
         {:ok, document}
-      
-      error ->
-        error
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -174,11 +184,11 @@ defmodule StudyBot.Documents do
         case extract_text_content(file_path, document.file_type) do
           {:ok, content} ->
             process_document_content(document, content)
-          
+
           {:error, reason} ->
             mark_failed(document, "Failed to extract content: #{reason}")
         end
-      
+
       {:error, _reason} ->
         mark_failed(document, "Failed to mark document as processing")
     end
@@ -188,16 +198,60 @@ defmodule StudyBot.Documents do
     case mark_processed(document, content) do
       {:ok, updated_document} ->
         chunks = chunk_text(content)
-        chunk_data = Enum.map(chunks, &Map.merge(&1, %{
-          document_id: updated_document.id,
-          course_id: updated_document.course_id
-        }))
-        
-        create_chunks(chunk_data)
-        
+
+        chunk_data =
+          Enum.map(
+            chunks,
+            &Map.merge(&1, %{
+              document_id: updated_document.id,
+              course_id: updated_document.course_id
+            })
+          )
+
+        # Create chunks in SQLite
+        created_chunks = create_chunks(chunk_data)
+
+        # Generate embeddings and store in Chroma
+        process_chunks_for_vector_storage(updated_document, created_chunks)
+
       {:error, _reason} ->
         mark_failed(document, "Failed to save processed content")
     end
+  end
+
+  defp process_chunks_for_vector_storage(document, chunks) do
+    # Ensure collection exists for this course (always succeeds now)
+    {:ok, _collection_name} = VectorStore.create_collection(document.course_id)
+
+    # Generate embeddings for all chunks
+    chunks_with_embeddings = generate_embeddings_for_chunks(chunks)
+
+    # Store in Chroma
+    case VectorStore.add_documents(document.course_id, chunks_with_embeddings) do
+      :ok ->
+        Logger.info(
+          "Successfully stored #{length(chunks)} chunks in vector database for document #{document.id}"
+        )
+
+      {:error, reason} ->
+        Logger.error("Failed to store chunks in vector database: #{reason}")
+        mark_failed(document, "Failed to store vectors: #{reason}")
+    end
+  end
+
+  defp generate_embeddings_for_chunks(chunks) do
+    chunks
+    |> Enum.map(fn chunk ->
+      case Client.generate_embedding(chunk.content) do
+        {:ok, embedding} ->
+          {chunk, embedding}
+
+        {:error, reason} ->
+          Logger.error("Failed to generate embedding for chunk #{chunk.id}: #{reason}")
+          nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
   end
 
   defp extract_text_content(file_path, "text") do

@@ -22,7 +22,7 @@ defmodule StudyBotWeb.Router do
     live "/courses/:id", ChatLive, :show
     live "/courses/:course_id/documents", DocumentsLive, :index
     live "/courses/:course_id/documents/upload", DocumentsLive, :upload
-    
+
     get "/courses/:course_id/documents/:id/download", DocumentController, :download
   end
 

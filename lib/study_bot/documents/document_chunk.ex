@@ -2,6 +2,19 @@ defmodule StudyBot.Documents.DocumentChunk do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @derive {Jason.Encoder,
+           only: [
+             :id,
+             :chunk_index,
+             :content,
+             :token_count,
+             :start_char,
+             :end_char,
+             :document_id,
+             :course_id,
+             :inserted_at,
+             :updated_at
+           ]}
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
@@ -14,15 +27,21 @@ defmodule StudyBot.Documents.DocumentChunk do
 
     belongs_to :document, StudyBot.Documents.Document
     belongs_to :course, StudyBot.Courses.Course
-    has_one :embedding, StudyBot.Embeddings.Embedding
 
     timestamps(type: :utc_datetime)
   end
 
   def changeset(chunk, attrs) do
     chunk
-    |> cast(attrs, [:document_id, :course_id, :chunk_index, :content, 
-                    :token_count, :start_char, :end_char])
+    |> cast(attrs, [
+      :document_id,
+      :course_id,
+      :chunk_index,
+      :content,
+      :token_count,
+      :start_char,
+      :end_char
+    ])
     |> validate_required([:document_id, :course_id, :chunk_index, :content])
     |> validate_number(:chunk_index, greater_than_or_equal_to: 0)
     |> validate_length(:content, min: 1)

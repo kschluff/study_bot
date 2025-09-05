@@ -10,7 +10,7 @@ defmodule StudyBot.Repo.Migrations.CreateDocuments do
       add :file_type, :string, null: false
       add :file_size, :integer, null: false
       add :content, :text
-      add :status, :string, default: "pending"
+      add :status, :string, null: false, default: "pending"
       add :error_message, :text
       add :processed_at, :utc_datetime
 
@@ -19,6 +19,6 @@ defmodule StudyBot.Repo.Migrations.CreateDocuments do
 
     create index(:documents, [:course_id])
     create index(:documents, [:status])
-    create index(:documents, [:file_type])
+    create index(:documents, [:filename])
   end
 end

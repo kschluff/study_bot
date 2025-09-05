@@ -57,8 +57,9 @@ defmodule StudyBot.Courses do
   end
 
   def count_processed_documents(course_id) do
-    from(d in StudyBot.Documents.Document, 
-         where: d.course_id == ^course_id and d.status == "processed")
+    from(d in StudyBot.Documents.Document,
+      where: d.course_id == ^course_id and d.status == "processed"
+    )
     |> Repo.aggregate(:count, :id)
   end
 end

@@ -13,6 +13,5 @@ defmodule StudyBot.Repo.Migrations.CreateCourses do
     end
 
     create unique_index(:courses, [:name])
-    create index(:courses, [:active])
   end
 end

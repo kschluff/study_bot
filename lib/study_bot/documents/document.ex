@@ -2,6 +2,18 @@ defmodule StudyBot.Documents.Document do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @derive {Jason.Encoder,
+           only: [
+             :id,
+             :filename,
+             :original_filename,
+             :file_type,
+             :file_size,
+             :status,
+             :processed_at,
+             :inserted_at,
+             :updated_at
+           ]}
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
@@ -23,8 +35,17 @@ defmodule StudyBot.Documents.Document do
 
   def changeset(document, attrs) do
     document
-    |> cast(attrs, [:course_id, :filename, :original_filename, :file_type, 
-                    :file_size, :content, :status, :error_message, :processed_at])
+    |> cast(attrs, [
+      :course_id,
+      :filename,
+      :original_filename,
+      :file_type,
+      :file_size,
+      :content,
+      :status,
+      :error_message,
+      :processed_at
+    ])
     |> validate_required([:course_id, :filename, :original_filename, :file_type, :file_size])
     |> validate_inclusion(:status, ["pending", "processing", "processed", "failed"])
     |> validate_inclusion(:file_type, ["text", "pdf"])
@@ -44,7 +65,7 @@ defmodule StudyBot.Documents.Document do
     change(document, %{
       status: "processed",
       content: content,
-      processed_at: DateTime.utc_now(),
+      processed_at: DateTime.utc_now() |> DateTime.truncate(:second),
       error_message: nil
     })
   end

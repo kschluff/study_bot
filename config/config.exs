@@ -66,7 +66,17 @@ config :study_bot,
   ai_provider: :openai,
   # API Keys
   openai_api_key: System.get_env("OPENAI_API_KEY"),
-  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY")
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
+  # File upload configuration
+  # 50MB in bytes
+  max_file_size: 50_000_000
+
+# Configure OpenAI
+config :openai,
+  api_key: System.get_env("OPENAI_API_KEY")
+
+# Configure Chroma vector database
+config :study_bot, :chroma, base_url: System.get_env("CHROMA_BASE_URL", "http://localhost:8000")
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

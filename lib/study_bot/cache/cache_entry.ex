@@ -21,10 +21,24 @@ defmodule StudyBot.Cache.CacheEntry do
 
   def changeset(entry, attrs) do
     entry
-    |> cast(attrs, [:course_id, :query_hash, :query_text, :query_embedding,
-                    :response_content, :context_chunks, :hit_count, :last_accessed_at])
-    |> validate_required([:course_id, :query_hash, :query_text, :query_embedding,
-                          :response_content, :last_accessed_at])
+    |> cast(attrs, [
+      :course_id,
+      :query_hash,
+      :query_text,
+      :query_embedding,
+      :response_content,
+      :context_chunks,
+      :hit_count,
+      :last_accessed_at
+    ])
+    |> validate_required([
+      :course_id,
+      :query_hash,
+      :query_text,
+      :query_embedding,
+      :response_content,
+      :last_accessed_at
+    ])
     |> unique_constraint([:course_id, :query_hash])
     |> assoc_constraint(:course)
   end
@@ -32,7 +46,7 @@ defmodule StudyBot.Cache.CacheEntry do
   def access_changeset(entry) do
     change(entry, %{
       hit_count: entry.hit_count + 1,
-      last_accessed_at: DateTime.utc_now()
+      last_accessed_at: DateTime.utc_now() |> DateTime.truncate(:second)
     })
   end
 end

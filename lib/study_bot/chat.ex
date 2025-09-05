@@ -9,8 +9,9 @@ defmodule StudyBot.Chat do
 
   def list_sessions(course_id) do
     from(s in ChatSession,
-         where: s.course_id == ^course_id and s.active == true,
-         order_by: [desc: s.updated_at])
+      where: s.course_id == ^course_id and s.active == true,
+      order_by: [desc: s.updated_at]
+    )
     |> Repo.all()
   end
 
@@ -31,6 +32,7 @@ defmodule StudyBot.Chat do
   end
 
   def get_messages(%ChatSession{messages: nil}), do: []
+
   def get_messages(%ChatSession{messages: messages_json}) do
     case Jason.decode(messages_json) do
       {:ok, messages} -> messages

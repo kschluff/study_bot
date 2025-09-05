@@ -6,5 +6,7 @@ import Config
 
 config :study_bot,
   ai_provider: :anthropic,
-  openai_api_key: System.get_env("OPENAI_API_KEY"),      # Required for embeddings
-  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY") # Required for chat completions
+  # Required for embeddings
+  openai_api_key: System.get_env("OPENAI_API_KEY"),
+  # Required for chat completions
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY")

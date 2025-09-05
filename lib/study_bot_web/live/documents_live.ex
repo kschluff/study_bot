@@ -1,14 +1,14 @@
 defmodule StudyBotWeb.DocumentsLive do
   use StudyBotWeb, :live_view
 
-  alias StudyBot.{Courses, Documents, RAG}
+  alias StudyBot.{Courses, Documents}
 
   @impl true
   def mount(%{"course_id" => course_id}, _session, socket) do
     case Courses.get_course(course_id) do
       %Courses.Course{} = course ->
         documents = Documents.list_documents(course.id)
-        
+
         {:ok,
          socket
          |> assign(:course, course)
@@ -18,7 +18,8 @@ defmodule StudyBotWeb.DocumentsLive do
          |> allow_upload(:documents,
            accept: ~w(.txt .pdf),
            max_entries: 5,
-           max_file_size: 10_000_000)}
+           max_file_size: Application.get_env(:study_bot, :max_file_size, 50_000_000)
+         )}
 
       nil ->
         {:ok,
@@ -43,6 +44,16 @@ defmodule StudyBotWeb.DocumentsLive do
 
   @impl true
   def handle_event("validate_upload", _params, socket) do
+    # LiveView uploads require validation to function properly
+    # Check for upload errors and handle them gracefully
+    socket = 
+      case upload_errors(socket.assigns.uploads.documents) do
+        [] -> socket
+        errors -> 
+          IO.inspect(errors, label: "Upload validation errors")
+          socket
+      end
+    
     {:noreply, socket}
   end
 
@@ -54,50 +65,48 @@ defmodule StudyBotWeb.DocumentsLive do
   @impl true
   def handle_event("upload_documents", _params, socket) do
     course = socket.assigns.course
-    
-    uploaded_files =
+
+    uploaded_results =
       consume_uploaded_entries(socket, :documents, fn %{path: path}, entry ->
         # Save the uploaded file to a temporary location
         dest_path = Path.join(System.tmp_dir(), "upload_#{entry.uuid}_#{entry.client_name}")
         File.cp!(path, dest_path)
-        
+
         case Documents.process_uploaded_file(dest_path, course.id, entry.client_name) do
           {:ok, document} ->
-            # Start processing embeddings
-            RAG.process_document_embeddings(document.id)
             {:ok, document}
-            
+
           {:error, reason} ->
             {:error, reason}
         end
       end)
-    
-    {successful, failed} = 
-      uploaded_files
-      |> Enum.split_with(fn
-        {:ok, _} -> true
-        {:error, _} -> false
-      end)
-    
+
+    #    {successful, failed} = 
+    #      uploaded_results
+    #      |> Enum.split_with(fn
+    #        # {:ok, _document} -> true
+    #        {:error, _reason} -> false
+    #      end)
+
     socket =
-      if length(successful) > 0 do
+      if length(uploaded_results) > 0 do
         documents = Documents.list_documents(course.id)
-        
+
         socket
         |> assign(:documents, documents)
-        |> put_flash(:info, "#{length(successful)} document(s) uploaded successfully!")
+        |> put_flash(:info, "#{length(uploaded_results)} document(s) uploaded successfully!")
       else
         socket
       end
-    
-    socket =
-      if length(failed) > 0 do
-        error_messages = Enum.map(failed, fn {:error, reason} -> reason end)
-        put_flash(socket, :error, "Failed to upload: #{Enum.join(error_messages, ", ")}")
-      else
-        socket
-      end
-    
+
+    #    socket =
+    #      if length(failed) > 0 do
+    #        error_messages = Enum.map(failed, fn {:error, reason} -> reason end)
+    #        put_flash(socket, :error, "Failed to upload: #{Enum.join(error_messages, ", ")}")
+    #      else
+    #        socket
+    #      end
+
     {:noreply, socket}
   end
 
@@ -105,9 +114,9 @@ defmodule StudyBotWeb.DocumentsLive do
   def handle_event("delete_document", %{"id" => id}, socket) do
     document = Documents.get_document!(id)
     {:ok, _} = Documents.delete_document(document)
-    
+
     documents = Documents.list_documents(socket.assigns.course.id)
-    
+
     {:noreply,
      socket
      |> assign(:documents, documents)
@@ -124,7 +133,7 @@ defmodule StudyBotWeb.DocumentsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app_wide flash={@flash}>
       <div class="min-h-screen bg-gray-50">
         <div class="container mx-auto px-6 py-8">
           <!-- Header -->
@@ -136,13 +145,13 @@ defmodule StudyBotWeb.DocumentsLive do
               >
                 <.icon name="hero-arrow-left" class="w-5 h-5" />
               </.link>
-              
+
               <div>
                 <h1 class="text-2xl font-bold text-gray-800">
                   Course Documents
                 </h1>
                 <p class="text-gray-600">
-                  <%= @course.name %>
+                  {@course.name}
                 </p>
               </div>
             </div>
@@ -150,22 +159,21 @@ defmodule StudyBotWeb.DocumentsLive do
             <div class="flex justify-between items-center">
               <div class="flex items-center gap-6 text-sm text-gray-600">
                 <span>
-                  <%= length(@documents) %> total documents
+                  {length(@documents)} total documents
                 </span>
                 <span>
-                  <%= Enum.count(@documents, &(&1.status == "processed")) %> processed
+                  {Enum.count(@documents, &(&1.status == "processed"))} processed
                 </span>
                 <span>
-                  <%= Enum.count(@documents, &(&1.status == "failed")) %> failed
+                  {Enum.count(@documents, &(&1.status == "failed"))} failed
                 </span>
               </div>
-              
+
               <.link
                 navigate={~p"/courses/#{@course.id}/documents/upload"}
                 class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
               >
-                <.icon name="hero-document-plus" class="w-5 h-5 inline mr-2" />
-                Upload Documents
+                <.icon name="hero-document-plus" class="w-5 h-5 inline mr-2" /> Upload Documents
               </.link>
             </div>
           </div>
@@ -174,7 +182,7 @@ defmodule StudyBotWeb.DocumentsLive do
             <!-- Upload Form -->
             <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
               <h2 class="text-xl font-semibold mb-6">Upload Course Documents</h2>
-              
+
               <form phx-submit="upload_documents" phx-change="validate_upload" id="upload-form">
                 <div class="mb-6">
                   <div
@@ -182,16 +190,16 @@ defmodule StudyBotWeb.DocumentsLive do
                     phx-drop-target={@uploads.documents.ref}
                   >
                     <.icon name="hero-document-arrow-up" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    
+
                     <div class="space-y-2">
                       <p class="text-lg font-medium text-gray-700">
                         Drop files here or click to browse
                       </p>
                       <p class="text-sm text-gray-500">
-                        Supports: PDF, TXT files (max 10MB each, up to 5 files)
+                        Supports: PDF, TXT files (max 50MB each, up to 5 files)
                       </p>
                     </div>
-                    
+
                     <label class="cursor-pointer">
                       <.live_file_input upload={@uploads.documents} class="sr-only" />
                       <span class="mt-4 inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200">
@@ -200,16 +208,16 @@ defmodule StudyBotWeb.DocumentsLive do
                     </label>
                   </div>
                   
-                  <!-- Upload Progress -->
+    <!-- Upload Progress -->
                   <%= for entry <- @uploads.documents.entries do %>
                     <div class="mt-4 p-4 border border-gray-200 rounded-lg">
                       <div class="flex justify-between items-center mb-2">
                         <span class="text-sm font-medium text-gray-700">
-                          <%= entry.client_name %>
+                          {entry.client_name}
                         </span>
                         <div class="flex items-center gap-2">
                           <span class="text-xs text-gray-500">
-                            <%= div(entry.client_size, 1024) %> KB
+                            {div(entry.client_size, 1024)} KB
                           </span>
                           <button
                             type="button"
@@ -221,7 +229,7 @@ defmodule StudyBotWeb.DocumentsLive do
                           </button>
                         </div>
                       </div>
-                      
+
                       <div class="w-full bg-gray-200 rounded-full h-2">
                         <div
                           class="bg-blue-600 h-2 rounded-full transition-all duration-300"
@@ -229,10 +237,10 @@ defmodule StudyBotWeb.DocumentsLive do
                         >
                         </div>
                       </div>
-                      
+
                       <%= for err <- upload_errors(@uploads.documents, entry) do %>
                         <p class="text-red-500 text-sm mt-1">
-                          <%= error_to_string(err) %>
+                          {error_to_string(err)}
                         </p>
                       <% end %>
                     </div>
@@ -246,7 +254,7 @@ defmodule StudyBotWeb.DocumentsLive do
                   >
                     Cancel
                   </.link>
-                  
+
                   <button
                     type="submit"
                     disabled={@uploads.documents.entries == []}
@@ -258,8 +266,8 @@ defmodule StudyBotWeb.DocumentsLive do
               </form>
             </div>
           <% end %>
-
-          <!-- Documents List -->
+          
+    <!-- Documents List -->
           <%= if @documents == [] do %>
             <div class="bg-white rounded-xl shadow-lg p-12 text-center">
               <div class="text-6xl mb-6">📚</div>
@@ -267,7 +275,7 @@ defmodule StudyBotWeb.DocumentsLive do
                 No documents uploaded yet
               </h3>
               <p class="text-gray-600 mb-6 max-w-md mx-auto">
-                Upload your course materials like textbooks, lecture notes, or PDFs 
+                Upload your course materials like textbooks, lecture notes, or PDFs
                 to enable AI-powered question answering.
               </p>
               <.link
@@ -303,47 +311,50 @@ defmodule StudyBotWeb.DocumentsLive do
                       </th>
                     </tr>
                   </thead>
-                  
+
                   <tbody class="divide-y divide-gray-200">
                     <%= for document <- @documents do %>
                       <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4">
                           <div class="flex items-center">
-                            <.icon name={document_icon(document.file_type)} class="w-5 h-5 text-gray-400 mr-3" />
+                            <.icon
+                              name={document_icon(document.file_type)}
+                              class="w-5 h-5 text-gray-400 mr-3"
+                            />
                             <div>
                               <p class="font-medium text-gray-900">
-                                <%= document.original_filename %>
+                                {document.original_filename}
                               </p>
                               <%= if document.error_message do %>
                                 <p class="text-sm text-red-600 mt-1">
-                                  <%= document.error_message %>
+                                  {document.error_message}
                                 </p>
                               <% end %>
                             </div>
                           </div>
                         </td>
-                        
+
                         <td class="px-6 py-4 text-sm text-gray-600 uppercase">
-                          <%= document.file_type %>
+                          {document.file_type}
                         </td>
-                        
+
                         <td class="px-6 py-4 text-sm text-gray-600">
-                          <%= format_file_size(document.file_size) %>
+                          {format_file_size(document.file_size)}
                         </td>
-                        
+
                         <td class="px-6 py-4">
                           <span class={[
                             "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
                             status_color(document.status)
                           ]}>
-                            <%= format_status(document.status) %>
+                            {format_status(document.status)}
                           </span>
                         </td>
-                        
+
                         <td class="px-6 py-4 text-sm text-gray-600">
-                          <%= Calendar.strftime(document.inserted_at, "%b %d, %Y") %>
+                          {Calendar.strftime(document.inserted_at, "%b %d, %Y")}
                         </td>
-                        
+
                         <td class="px-6 py-4 text-right">
                           <div class="flex justify-end gap-2">
                             <%= if document.status == "failed" do %>
@@ -356,7 +367,7 @@ defmodule StudyBotWeb.DocumentsLive do
                                 <.icon name="hero-arrow-path" class="w-4 h-4" />
                               </button>
                             <% end %>
-                            
+
                             <button
                               phx-click="delete_document"
                               phx-value-id={document.id}
@@ -377,7 +388,7 @@ defmodule StudyBotWeb.DocumentsLive do
           <% end %>
         </div>
       </div>
-    </Layouts.app>
+    </Layouts.app_wide>
     """
   end
 
@@ -398,7 +409,7 @@ defmodule StudyBotWeb.DocumentsLive do
   defp status_color("processed"), do: "bg-green-100 text-green-800"
   defp status_color("failed"), do: "bg-red-100 text-red-800"
 
-  defp error_to_string(:too_large), do: "File too large (max 10MB)"
+  defp error_to_string(:too_large), do: "File too large (max 50MB)"
   defp error_to_string(:too_many_files), do: "Too many files (max 5)"
   defp error_to_string(:not_accepted), do: "File type not supported"
   defp error_to_string(_), do: "Upload error"

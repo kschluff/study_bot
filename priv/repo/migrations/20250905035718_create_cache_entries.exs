@@ -16,9 +16,8 @@ defmodule StudyBot.Repo.Migrations.CreateCacheEntries do
       timestamps(type: :utc_datetime)
     end
 
-    create index(:cache_entries, [:course_id])
-    create index(:cache_entries, [:query_hash])
-    create index(:cache_entries, [:last_accessed_at])
     create unique_index(:cache_entries, [:course_id, :query_hash])
+    create index(:cache_entries, [:course_id])
+    create index(:cache_entries, [:last_accessed_at])
   end
 end

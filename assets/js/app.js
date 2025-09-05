@@ -25,11 +25,57 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/study_bot"
 import topbar from "../vendor/topbar"
 
+// ScrollToBottom hook for chat messages
+const ScrollToBottom = {
+  mounted() {
+    this.scrollToBottom()
+  },
+  updated() {
+    this.scrollToBottom()
+  },
+  scrollToBottom() {
+    // Small delay to ensure DOM updates are complete
+    setTimeout(() => {
+      this.el.scrollTop = this.el.scrollHeight
+    }, 10)
+  }
+}
+
+// ScrollButton hook for scroll-to-bottom button
+const ScrollButton = {
+  mounted() {
+    this.messagesContainer = document.getElementById('messages-container')
+    this.button = this.el.querySelector('#scroll-to-bottom-btn')
+    
+    if (this.messagesContainer && this.button) {
+      // Show/hide button based on scroll position
+      this.messagesContainer.addEventListener('scroll', () => {
+        const { scrollTop, scrollHeight, clientHeight } = this.messagesContainer
+        const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100
+        
+        if (isNearBottom) {
+          this.el.classList.add('hidden')
+        } else {
+          this.el.classList.remove('hidden')
+        }
+      })
+      
+      // Handle button click
+      this.button.addEventListener('click', () => {
+        this.messagesContainer.scrollTo({
+          top: this.messagesContainer.scrollHeight,
+          behavior: 'smooth'
+        })
+      })
+    }
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, ScrollToBottom, ScrollButton},
 })
 
 // Show progress bar on live navigation and form submits

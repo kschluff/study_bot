@@ -6,4 +6,5 @@ import Config
 config :study_bot,
   ai_provider: :openai,
   openai_api_key: System.get_env("OPENAI_API_KEY"),
-  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY")  # Optional, not used with OpenAI provider
+  # Optional, not used with OpenAI provider
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY")
