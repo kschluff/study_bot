@@ -1,0 +1,46 @@
+# Git
+.git/
+.gitignore
+
+# Dependencies
+deps/
+_build/
+node_modules/
+
+# Development files
+.env
+.env.local
+
+# Data directories
+data/
+chroma_data/
+venv/
+
+# Test files
+test/
+cover/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Development database
+*.db
+*.db-*

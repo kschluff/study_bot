@@ -12,7 +12,7 @@ defmodule StudyBot.Cache do
   @cache_ttl_hours 24
   @max_cache_entries_per_course 100
   # Increased from 0.85 to require much higher similarity
-  @similarity_threshold 0.95
+  @similarity_threshold 0.99
 
   def lookup_cache(course_id, query_text, query_embedding) do
     query_hash = generate_query_hash(query_text)
