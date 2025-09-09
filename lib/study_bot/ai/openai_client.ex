@@ -16,7 +16,7 @@ defmodule StudyBot.AI.OpenAIClient do
   def chat_completion(messages, opts \\ %{}) do
     model = Map.get(opts, :model, @chat_model)
     # GPT-5 models use reasoning tokens, so need more total tokens
-    default_tokens = if String.starts_with?(model, "gpt-5"), do: 2000, else: 500
+    default_tokens = if String.starts_with?(model, "gpt-5"), do: 5000, else: 500
     max_tokens = Map.get(opts, :max_tokens, default_tokens)
     temperature = Map.get(opts, :temperature, 0.7)
 

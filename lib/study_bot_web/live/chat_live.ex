@@ -253,7 +253,7 @@ defmodule StudyBotWeb.ChatLive do
           <!-- Chat Messages -->
           <div
             id="messages-container"
-            class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6"
+            class="flex-1 overflow-y-auto p-2 md:p-4 space-y-1"
             phx-hook="ScrollToBottom"
           >
             <%= if @messages == [] do %>
@@ -270,11 +270,11 @@ defmodule StudyBotWeb.ChatLive do
             <% else %>
               <%= for message <- @messages do %>
                 <div class={[
-                  "flex",
+                  "flex mb-1",
                   if(message["role"] == "user", do: "justify-end", else: "justify-start")
                 ]}>
                   <div class={[
-                    "max-w-4xl lg:max-w-5xl px-4 py-3 rounded-lg",
+                    "max-w-4xl lg:max-w-5xl px-2 py-1 mx-1 rounded-lg",
                     case message["role"] do
                       "user" ->
                         "bg-blue-600 text-white"
@@ -288,14 +288,8 @@ defmodule StudyBotWeb.ChatLive do
                         end
                     end
                   ]}>
-                    <div class="whitespace-pre-wrap">
+                    <div class="whitespace-pre-wrap text-sm leading-tight">
                       {message["content"]}
-                    </div>
-                    <div class={[
-                      "text-xs mt-2 opacity-70",
-                      if(message["role"] == "user", do: "text-blue-100", else: "text-gray-500")
-                    ]}>
-                      {format_timestamp(message["timestamp"])}
                     </div>
                   </div>
                 </div>
@@ -303,8 +297,8 @@ defmodule StudyBotWeb.ChatLive do
             <% end %>
 
             <%= if @loading do %>
-              <div class="flex justify-start">
-                <div class="bg-white border border-gray-200 text-gray-800 max-w-4xl lg:max-w-5xl px-4 py-3 rounded-lg">
+              <div class="flex justify-start mb-1">
+                <div class="bg-white border border-gray-200 text-gray-800 max-w-4xl lg:max-w-5xl px-2 py-1 mx-1 rounded-lg">
                   <div class="flex items-center space-x-2">
                     <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                     <span class="text-sm">Thinking...</span>
@@ -339,6 +333,7 @@ defmodule StudyBotWeb.ChatLive do
                 phx-change="update_query"
                 placeholder="Ask a question about your course materials..."
                 disabled={@loading}
+                autocomplete="off"
                 class="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                 autofocus
               />
