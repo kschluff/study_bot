@@ -9,6 +9,9 @@ defmodule StudyBotWeb.DocumentsLive do
       %Courses.Course{} = course ->
         documents = Documents.list_documents(course.id)
 
+        # Subscribe to document updates for this course
+        Phoenix.PubSub.subscribe(StudyBot.PubSub, "course:#{course.id}:documents")
+
         {:ok,
          socket
          |> assign(:course, course)
@@ -46,14 +49,16 @@ defmodule StudyBotWeb.DocumentsLive do
   def handle_event("validate_upload", _params, socket) do
     # LiveView uploads require validation to function properly
     # Check for upload errors and handle them gracefully
-    socket = 
+    socket =
       case upload_errors(socket.assigns.uploads.documents) do
-        [] -> socket
-        errors -> 
+        [] ->
+          socket
+
+        errors ->
           IO.inspect(errors, label: "Upload validation errors")
           socket
       end
-    
+
     {:noreply, socket}
   end
 
@@ -128,6 +133,21 @@ defmodule StudyBotWeb.DocumentsLive do
     # This would trigger reprocessing of a failed document
     # Implementation would depend on storing the original file path
     {:noreply, put_flash(socket, :info, "Document reprocessing started")}
+  end
+
+  @impl true
+  def handle_info({:document_updated, updated_document}, socket) do
+    # Update the document in the list
+    documents =
+      Enum.map(socket.assigns.documents, fn document ->
+        if document.id == updated_document.id do
+          updated_document
+        else
+          document
+        end
+      end)
+
+    {:noreply, assign(socket, :documents, documents)}
   end
 
   @impl true

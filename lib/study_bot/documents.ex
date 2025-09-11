@@ -37,21 +37,42 @@ defmodule StudyBot.Documents do
   end
 
   def mark_processing(%Document{} = document) do
-    document
-    |> Document.processing_changeset()
-    |> Repo.update()
+    case document
+         |> Document.processing_changeset()
+         |> Repo.update() do
+      {:ok, updated_document} = result ->
+        broadcast_document_update(updated_document)
+        result
+
+      error ->
+        error
+    end
   end
 
   def mark_processed(%Document{} = document, content) do
-    document
-    |> Document.processed_changeset(content)
-    |> Repo.update()
+    case document
+         |> Document.processed_changeset(content)
+         |> Repo.update() do
+      {:ok, updated_document} = result ->
+        broadcast_document_update(updated_document)
+        result
+
+      error ->
+        error
+    end
   end
 
   def mark_failed(%Document{} = document, error_message) do
-    document
-    |> Document.failed_changeset(error_message)
-    |> Repo.update()
+    case document
+         |> Document.failed_changeset(error_message)
+         |> Repo.update() do
+      {:ok, updated_document} = result ->
+        broadcast_document_update(updated_document)
+        result
+
+      error ->
+        error
+    end
   end
 
   def delete_document(%Document{} = document) do
@@ -282,5 +303,14 @@ defmodule StudyBot.Documents do
     extension = Path.extname(original_filename)
     base_name = Path.basename(original_filename, extension)
     "#{timestamp}_#{base_name}#{extension}"
+  end
+
+  # PubSub broadcast helper
+  defp broadcast_document_update(%Document{} = document) do
+    Phoenix.PubSub.broadcast(
+      StudyBot.PubSub,
+      "course:#{document.course_id}:documents",
+      {:document_updated, document}
+    )
   end
 end
