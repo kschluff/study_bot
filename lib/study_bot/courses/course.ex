@@ -14,7 +14,6 @@ defmodule StudyBot.Courses.Course do
     has_many :documents, StudyBot.Documents.Document
     has_many :document_chunks, StudyBot.Documents.DocumentChunk
     has_many :chat_sessions, StudyBot.Chat.ChatSession
-    has_many :cache_entries, StudyBot.Cache.CacheEntry
 
     timestamps(type: :utc_datetime)
   end

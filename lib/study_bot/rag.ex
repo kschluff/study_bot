@@ -1,10 +1,10 @@
 defmodule StudyBot.RAG do
   @moduledoc """
-  The RAG (Retrieval-Augmented Generation) system that combines document search,
-  semantic caching, and response generation.
+  The RAG (Retrieval-Augmented Generation) system that combines document search
+  and response generation.
   """
 
-  alias StudyBot.{Courses, Documents, VectorStore, Cache, Chat}
+  alias StudyBot.{Courses, Documents, VectorStore, Chat}
   alias StudyBot.Documents.DocumentChunk
   alias StudyBot.AI.Client
 
@@ -17,23 +17,28 @@ defmodule StudyBot.RAG do
          {:ok, query_embedding} <- Client.generate_embedding(query_text) do
       # Get conversation context from session
       conversation_context = get_conversation_context(session_id)
-      
-      case Cache.lookup_cache(course_id, query_text, query_embedding) do
-        {:hit, cached_response} ->
-          Logger.info("Cache hit for query in course #{course.name}")
-          maybe_save_to_session(session_id, query_text, cached_response)
-          {:ok, cached_response, :cached}
 
-        :miss ->
-          Logger.info("Cache miss, processing query for course #{course.name}")
-          process_query_with_retrieval(course, query_text, query_embedding, session_id, conversation_context)
-      end
+      Logger.info("Processing query for course #{course.name}")
+
+      process_query_with_retrieval(
+        course,
+        query_text,
+        query_embedding,
+        session_id,
+        conversation_context
+      )
     else
       error -> error
     end
   end
 
-  defp process_query_with_retrieval(course, query_text, query_embedding, session_id, conversation_context) do
+  defp process_query_with_retrieval(
+         course,
+         query_text,
+         query_embedding,
+         session_id,
+         conversation_context
+       ) do
     # Perform hybrid search
     relevant_chunks = search_relevant_content(course.id, query_text, query_embedding)
 
@@ -41,7 +46,6 @@ defmodule StudyBot.RAG do
       [] ->
         # No relevant content found, use fallback LLM
         response = generate_fallback_response(query_text, course.name, conversation_context)
-        Cache.cache_response(course.id, query_text, query_embedding, response)
         maybe_save_to_session(session_id, query_text, response)
         {:ok, response, :fallback}
 
@@ -49,7 +53,6 @@ defmodule StudyBot.RAG do
         # Generate RAG response with context
         case generate_rag_response(query_text, chunks, course.name, conversation_context) do
           {:ok, response} ->
-            Cache.cache_response(course.id, query_text, query_embedding, response, chunks)
             maybe_save_to_session(session_id, query_text, response)
             {:ok, response, :rag}
 
@@ -196,7 +199,7 @@ defmodule StudyBot.RAG do
 
     Answer the user's question based on the provided context from course materials and the conversation history.
 
-    Your goal is to help the student understand the material.  Add clarification and explain the source material, don't just quote the material.  Provide your answers in language appropriate for a first year college student.
+    Your goal is to help the student understand the material.  Add clarification and explain the source material, don't just quote the material.  Provide your answers in language appropriate for a first year community college student.
 
     Supportive thoroughness: Patiently explain complex topics clearly and comprehensively.
 
@@ -213,16 +216,21 @@ defmodule StudyBot.RAG do
 
     Consider the conversation history when answering. Reference previous questions and answers when relevant to provide continuity and build upon earlier explanations.
 
+    Format the response using Markdown syntax.
+
     Context from course materials:
     #{context}
     """
 
     # Build message list with conversation history
-    messages = [
-      %{role: "system", content: system_prompt}
-    ] ++ conversation_context ++ [
-      %{role: "user", content: query_text}
-    ]
+    messages =
+      [
+        %{role: "system", content: system_prompt}
+      ] ++
+        conversation_context ++
+        [
+          %{role: "user", content: query_text}
+        ]
 
     case Client.chat_completion(messages) do
       {:ok, response} ->
@@ -242,16 +250,19 @@ defmodule StudyBot.RAG do
     The user asked a question, but I couldn't find relevant information in the course materials.
     Provide a helpful general response to their question, but clearly state that this information 
     is not from the course materials and they should verify with their instructor or textbook.
-    
+
     Consider the conversation history when answering to maintain continuity with previous responses.
     """
 
     # Build message list with conversation history
-    messages = [
-      %{role: "system", content: system_prompt}
-    ] ++ conversation_context ++ [
-      %{role: "user", content: query_text}
-    ]
+    messages =
+      [
+        %{role: "system", content: system_prompt}
+      ] ++
+        conversation_context ++
+        [
+          %{role: "user", content: query_text}
+        ]
 
     case Client.chat_completion(messages) do
       {:ok, response} ->
@@ -378,7 +389,7 @@ defmodule StudyBot.RAG do
     case Chat.get_session(session_id) do
       %Chat.ChatSession{} = session ->
         messages = Chat.get_messages(session)
-        
+
         # Convert last few messages to conversation context, excluding current query
         # Limit to last 6 messages (3 exchanges) to keep context manageable
         messages
@@ -389,7 +400,7 @@ defmodule StudyBot.RAG do
             content: clean_message_content(message["content"])
           }
         end)
-        
+
       nil ->
         Logger.warning("Session #{session_id} not found for context")
         []
