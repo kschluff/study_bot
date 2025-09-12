@@ -9,7 +9,7 @@ defmodule StudyBot.AI.OpenAIClient do
 
   @embedding_model "text-embedding-ada-002"
   @embedding_dimensions 1536
-#  @chat_model "gpt-3.5-turbo"
+  #  @chat_model "gpt-3.5-turbo"
   @chat_model "gpt-5-mini"
 
   @impl true
@@ -21,41 +21,55 @@ defmodule StudyBot.AI.OpenAIClient do
     temperature = Map.get(opts, :temperature, 0.7)
 
     # Use max_completion_tokens for GPT-5 models, max_tokens for others
-    token_param = if String.starts_with?(model, "gpt-5") do
-      [max_completion_tokens: max_tokens]
-    else
-      [max_tokens: max_tokens]
-    end
+    token_param =
+      if String.starts_with?(model, "gpt-5") do
+        [max_completion_tokens: max_tokens]
+      else
+        [max_tokens: max_tokens]
+      end
 
     # GPT-5 models only support temperature=1 (default), omit temperature param
-    temperature_param = if String.starts_with?(model, "gpt-5") do
-      []
-    else
-      [temperature: temperature]
-    end
+    temperature_param =
+      if String.starts_with?(model, "gpt-5") do
+        []
+      else
+        [temperature: temperature]
+      end
 
-    params = [
-      model: model,
-      messages: messages
-    ] ++ token_param ++ temperature_param
+    params =
+      [
+        model: model,
+        messages: messages
+      ] ++ token_param ++ temperature_param
 
     api_key = Application.get_env(:study_bot, :openai_api_key)
 
-    case OpenAI.chat_completion(params, %{api_key: api_key, organization_key: nil, beta: nil, http_options: [recv_timeout: 120_000]}) do
+    case OpenAI.chat_completion(params, %{
+           api_key: api_key,
+           organization_key: nil,
+           beta: nil,
+           http_options: [recv_timeout: 120_000]
+         }) do
       {:ok, response} ->
         Logger.debug("OpenAI response: #{inspect(response, pretty: true)}")
+
         case response do
           %{choices: [%{"message" => %{"content" => content}} | _]} when content != "" ->
             {:ok, String.trim(content)}
+
           %{choices: [%{"message" => message} | _]} ->
             # Handle reasoning models that might have empty content
             Logger.warning("Empty content in response, full message: #{inspect(message)}")
+
             case message do
               %{"refusal" => refusal} when refusal != nil ->
                 {:error, "Request refused: #{refusal}"}
+
               _ ->
-                {:error, "Empty response content - model may have hit token limit or reasoning issue"}
+                {:error,
+                 "Empty response content - model may have hit token limit or reasoning issue"}
             end
+
           _ ->
             Logger.error("Unexpected response format: #{inspect(response)}")
             {:error, "Unexpected response format"}
@@ -73,7 +87,12 @@ defmodule StudyBot.AI.OpenAIClient do
 
     case OpenAI.embeddings(
            [model: @embedding_model, input: text],
-           %{api_key: api_key, organization_key: nil, beta: nil, http_options: [recv_timeout: 60_000]}
+           %{
+             api_key: api_key,
+             organization_key: nil,
+             beta: nil,
+             http_options: [recv_timeout: 60_000]
+           }
          ) do
       {:ok, %{data: [%{"embedding" => vector} | _]}} ->
         {:ok, vector}

@@ -258,7 +258,7 @@ defmodule StudyBotWeb.ChatLive do
           >
             <%= if @messages == [] do %>
               <div class="text-center py-12">
-                <div class="text-6xl mb-4">🤖</div>
+                <div class="text-6xl mb-4">💬</div>
                 <h3 class="text-xl font-semibold text-gray-700 mb-2">
                   Ready to help you study!
                 </h3>
