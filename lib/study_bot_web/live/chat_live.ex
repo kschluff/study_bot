@@ -291,6 +291,18 @@ defmodule StudyBotWeb.ChatLive do
                     <div class="whitespace-pre-wrap text-sm leading-tight">
                       {message["content"]}
                     </div>
+                    <%= if message["role"] == "assistant" and not String.starts_with?(message["content"], "❌") do %>
+                      <div class="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200">
+                        <button
+                          class="tts-button flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors"
+                          data-text={strip_indicators(message["content"])}
+                          title="Listen to this message"
+                        >
+                          <.icon name="hero-speaker-wave" class="w-3 h-3" />
+                          <span class="button-text">Speak</span>
+                        </button>
+                      </div>
+                    <% end %>
                   </div>
                 </div>
               <% end %>
@@ -360,16 +372,10 @@ defmodule StudyBotWeb.ChatLive do
     """
   end
 
-  defp format_timestamp(%DateTime{} = datetime) do
-    Calendar.strftime(datetime, "%H:%M")
-  end
 
-  defp format_timestamp(timestamp_string) when is_binary(timestamp_string) do
-    case DateTime.from_iso8601(timestamp_string) do
-      {:ok, datetime, _offset} -> Calendar.strftime(datetime, "%H:%M")
-      {:error, _} -> "??:??"
-    end
+  defp strip_indicators(content) do
+    content
+    |> String.replace(~r/^[🔄⚠️]\s*/, "")
+    |> String.trim()
   end
-
-  defp format_timestamp(_), do: "??:??"
 end

@@ -24,6 +24,7 @@ defmodule StudyBotWeb.Router do
     live "/courses/:course_id/documents/upload", DocumentsLive, :upload
 
     get "/courses/:course_id/documents/:id/download", DocumentController, :download
+    post "/tts/generate", TTSController, :generate
   end
 
   # Other scopes may use custom stacks.

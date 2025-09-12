@@ -209,14 +209,10 @@ defmodule StudyBot.RAG do
 
     Confidence-building: Foster intellectual curiosity and self-assurance.    
 
-    IMPORTANT: When you reference information from the context, always cite your sources using the format [Source X] where X is the source number. For example: "According to the documentation [Source 1], software requirements must be traceable [Source 2]."
-
     If the context doesn't contain enough information to answer the question, 
     say so clearly and provide what information you can.
 
     Consider the conversation history when answering. Reference previous questions and answers when relevant to provide continuity and build upon earlier explanations.
-
-    Format the response using Markdown syntax.
 
     Context from course materials:
     #{context}

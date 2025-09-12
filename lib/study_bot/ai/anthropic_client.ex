@@ -67,6 +67,12 @@ defmodule StudyBot.AI.AnthropicClient do
   @impl true
   def get_embedding_dimensions, do: @embedding_dimensions
 
+  @impl true
+  def text_to_speech(_text, _opts \\ %{}) do
+    # Anthropic doesn't provide TTS, fallback to OpenAI
+    {:error, "Text-to-speech not supported by Anthropic provider"}
+  end
+
   defp convert_messages_to_claude_format(messages) do
     system_messages = Enum.filter(messages, &(&1.role == "system"))
     non_system_messages = Enum.reject(messages, &(&1.role == "system"))

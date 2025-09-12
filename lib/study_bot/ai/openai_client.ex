@@ -108,4 +108,44 @@ defmodule StudyBot.AI.OpenAIClient do
 
   @impl true
   def get_embedding_dimensions, do: @embedding_dimensions
+
+  @impl true
+  def text_to_speech(text, opts \\ %{}) do
+    model = Map.get(opts, :model, "tts-1")
+    voice = Map.get(opts, :voice, "alloy")
+    response_format = Map.get(opts, :response_format, "mp3")
+    speed = Map.get(opts, :speed, 1.0)
+
+    api_key = Application.get_env(:study_bot, :openai_api_key)
+
+    # Use Req to make the HTTP request since OpenAI Elixir SDK doesn't support TTS
+    url = "https://api.openai.com/v1/audio/speech"
+
+    headers = [
+      {"Authorization", "Bearer #{api_key}"},
+      {"Content-Type", "application/json"}
+    ]
+
+    body =
+      Jason.encode!(%{
+        model: model,
+        input: text,
+        voice: voice,
+        response_format: response_format,
+        speed: speed
+      })
+
+    case Req.post(url, headers: headers, body: body) do
+      {:ok, %{status: 200, body: audio_data}} ->
+        {:ok, audio_data}
+
+      {:ok, %{status: status, body: error_body}} ->
+        Logger.error("OpenAI TTS request failed with status #{status}: #{inspect(error_body)}")
+        {:error, "TTS request failed with status #{status}"}
+
+      {:error, reason} ->
+        Logger.error("OpenAI TTS request failed: #{inspect(reason)}")
+        {:error, "Failed to generate speech"}
+    end
+  end
 end

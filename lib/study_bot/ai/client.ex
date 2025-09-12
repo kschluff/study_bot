@@ -7,6 +7,8 @@ defmodule StudyBot.AI.Client do
   @callback chat_completion(messages :: list(), opts :: map()) ::
               {:ok, String.t()} | {:error, any()}
   @callback generate_embedding(text :: String.t()) :: {:ok, list()} | {:error, any()}
+  @callback text_to_speech(text :: String.t(), opts :: map()) ::
+              {:ok, binary()} | {:error, any()}
   @callback get_embedding_model() :: String.t()
   @callback get_embedding_dimensions() :: integer()
 
@@ -48,5 +50,12 @@ defmodule StudyBot.AI.Client do
   """
   def get_embedding_dimensions do
     provider_module().get_embedding_dimensions()
+  end
+
+  @doc """
+  Generate speech audio from text using the configured provider.
+  """
+  def text_to_speech(text, opts \\ %{}) do
+    provider_module().text_to_speech(text, opts)
   end
 end

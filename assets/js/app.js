@@ -71,6 +71,169 @@ const ScrollButton = {
   }
 }
 
+// TTS functionality
+class TTSManager {
+  constructor() {
+    this.currentAudio = null
+    this.currentController = null
+    this.currentButton = null
+    this.setupEventListeners()
+  }
+
+  setupEventListeners() {
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('.tts-button')) {
+        e.preventDefault()
+        const button = e.target.closest('.tts-button')
+        this.handleTTSClick(button)
+      }
+    })
+  }
+
+  async handleTTSClick(button) {
+    const buttonText = button.querySelector('.button-text')
+    const currentState = buttonText.textContent
+
+    // If currently loading or playing, stop the audio
+    if (currentState === 'Loading...' || currentState === 'Playing...') {
+      this.stopCurrentAudio()
+      return
+    }
+
+    const text = button.dataset.text
+    if (!text || text.trim() === '') return
+
+    // Stop any currently playing audio
+    this.stopCurrentAudio()
+
+    // Update button state
+    const originalText = currentState
+    buttonText.textContent = 'Loading...'
+    button.disabled = false // Keep enabled so user can click to cancel
+    
+    // Store current button for cancellation
+    this.currentButton = button
+    
+    // Create abort controller for cancelling the request
+    this.currentController = new AbortController()
+
+    try {
+      const audioData = await this.generateSpeech(text, this.currentController.signal)
+      
+      // Check if we were cancelled during the request
+      if (this.currentController.signal.aborted) {
+        return
+      }
+      
+      const audioUrl = URL.createObjectURL(new Blob([audioData], { type: 'audio/mpeg' }))
+      
+      const audio = new Audio(audioUrl)
+      this.currentAudio = audio
+      
+      audio.addEventListener('loadstart', () => {
+        if (!this.currentController.signal.aborted) {
+          buttonText.textContent = 'Playing...'
+        }
+      })
+      
+      audio.addEventListener('ended', () => {
+        this.resetButton(button, originalText)
+        URL.revokeObjectURL(audioUrl)
+        this.clearCurrent()
+      })
+      
+      audio.addEventListener('error', () => {
+        this.resetButton(button, originalText)
+        URL.revokeObjectURL(audioUrl)
+        this.clearCurrent()
+        console.error('Audio playback failed')
+      })
+      
+      await audio.play()
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        // Request was cancelled, reset button
+        this.resetButton(button, originalText)
+      } else {
+        console.error('TTS failed:', error)
+        
+        // Show error feedback
+        buttonText.textContent = 'Error'
+        setTimeout(() => {
+          this.resetButton(button, originalText)
+        }, 2000)
+      }
+      this.clearCurrent()
+    }
+  }
+
+  async generateSpeech(text, signal) {
+    const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
+    
+    const response = await fetch('/tts/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken
+      },
+      body: JSON.stringify({ text }),
+      signal: signal
+    })
+
+    if (!response.ok) {
+      throw new Error(`TTS request failed: ${response.status}`)
+    }
+
+    return await response.arrayBuffer()
+  }
+
+  resetButton(button, originalText) {
+    const buttonText = button.querySelector('.button-text')
+    if (buttonText) {
+      buttonText.textContent = originalText
+    }
+    button.disabled = false
+  }
+
+  clearCurrent() {
+    this.currentAudio = null
+    this.currentController = null
+    this.currentButton = null
+  }
+
+  stopCurrentAudio() {
+    // Abort any pending request
+    if (this.currentController) {
+      this.currentController.abort()
+    }
+    
+    // Stop any playing audio
+    if (this.currentAudio) {
+      this.currentAudio.pause()
+      this.currentAudio.currentTime = 0
+    }
+    
+    // Reset the current button if it exists
+    if (this.currentButton) {
+      this.resetButton(this.currentButton, 'Speak')
+    }
+    
+    // Reset all button states as fallback
+    document.querySelectorAll('.tts-button').forEach(button => {
+      const buttonText = button.querySelector('.button-text')
+      if (buttonText && (buttonText.textContent === 'Loading...' || buttonText.textContent === 'Playing...' || buttonText.textContent === 'Error')) {
+        buttonText.textContent = 'Speak'
+      }
+      button.disabled = false
+    })
+    
+    this.clearCurrent()
+  }
+}
+
+// Initialize TTS manager
+new TTSManager()
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
