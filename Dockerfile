@@ -86,7 +86,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # Install ChromaDB runtime dependency
-RUN pip3 install --no-cache-dir chromadb==1.0.20
+RUN pip3 install --no-cache-dir --break-system-packages chromadb==1.0.20
 
 # Set the locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
