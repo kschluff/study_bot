@@ -74,6 +74,8 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    python3 \
+    python3-pip \
     gosu \
     libncurses5 \
     libsqlite3-0 \
@@ -82,6 +84,9 @@ RUN apt-get update \
     poppler-utils \
     wget \
   && rm -rf /var/lib/apt/lists/*
+
+# Install ChromaDB runtime dependency
+RUN pip3 install --no-cache-dir chromadb==1.0.20
 
 # Set the locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
