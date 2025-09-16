@@ -16,5 +16,12 @@ config :swoosh, local: false
 # Do not print debug messages in production
 config :logger, level: :info
 
+# Console backend for Docker container logging
+config :logger, backends: [:console]
+
+config :logger, :console,
+  format: "$time $metadata[$level] $message\n",
+  metadata: [:request_id]
+
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

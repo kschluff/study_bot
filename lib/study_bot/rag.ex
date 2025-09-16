@@ -4,7 +4,7 @@ defmodule StudyBot.RAG do
   and response generation.
   """
 
-  alias StudyBot.{Courses, Documents, VectorStore, Chat}
+  alias StudyBot.{Courses, Documents, VectorStore, Chat, Text}
   alias StudyBot.Documents.DocumentChunk
   alias StudyBot.AI.Client
 
@@ -262,11 +262,20 @@ defmodule StudyBot.RAG do
 
     case Client.chat_completion(messages) do
       {:ok, response} ->
-        "⚠️ **Information not found in course materials**\n\n" <>
-          response <> "\n\n**Sources:** General knowledge (not from course documents)"
+        fallback_notice = "**Information not found in course materials**\n\n"
+
+        [
+          fallback_notice,
+          response,
+          "\n\n**Sources:** General knowledge (not from course documents)"
+        ]
+        |> Enum.join()
+        |> Text.sanitize()
 
       {:error, _} ->
-        "I'm sorry, I couldn't find information about this topic in your course materials, and I'm currently unable to provide a general response. Please consult your textbook or instructor for help with this question.\n\n**Sources:** None available"
+        Text.sanitize(
+          "I'm sorry, I couldn't find information about this topic in your course materials, and I'm currently unable to provide a general response. Please consult your textbook or instructor for help with this question.\n\n**Sources:** None available"
+        )
     end
   end
 

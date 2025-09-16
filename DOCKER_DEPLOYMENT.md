@@ -1,153 +1,108 @@
-# Docker Deployment for StudyBot on M4 Mac
+# Docker Deployment Guide
 
-This guide provides Docker deployment for StudyBot with embedded ChromaDB, optimized for M4 Mac (Apple Silicon).
+This document describes how to run StudyBot with Docker using the current two-container architecture: one container hosts the Phoenix release and another hosts ChromaDB.
 
-## Architecture
+## Overview
 
-- **Single Container**: Phoenix application and ChromaDB run in the same container
-- **Supervisor**: Uses supervisord to manage both services
-- **Internal Communication**: ChromaDB runs on localhost:8000 (not exposed externally)
-- **Data Persistence**: SQLite and ChromaDB data are persisted via Docker volumes
+- **Services**
+  - `study_bot`: Phoenix release built from `Dockerfile`. The release runs as a non-root user and exposes port 4000.
+  - `chroma`: Standalone ChromaDB server built from `Dockerfile.chroma`. Exposes port 8000 for Phoenix.
+- **Orchestration**: `docker-compose.yml` wires both services together. Phoenix waits for the Chroma health check before starting.
+- **Persistence**: Application data persists on the host via bind mounts:
+  - `./data` → SQLite database (`study_bot.db`)
+  - `./chroma_data` → ChromaDB storage
+- **Health checks**: Phoenix replies to `HEAD /health`. Chroma exposes `/api/v2/heartbeat`.
 
 ## Prerequisites
 
-1. **Docker Desktop**: Install Docker Desktop for Mac (Apple Silicon version)
-2. **API Keys**: OpenAI API key (required for embeddings)
+1. Docker Desktop (or engine) with Compose v2
+2. OpenAI API key (required). Anthropic key is optional.
 
 ## Quick Start
 
-1. **Set up environment variables**:
+1. Create a `.env` file in the repository root:
+
    ```bash
-   export OPENAI_API_KEY="your-openai-api-key-here"
-   # Optional: export ANTHROPIC_API_KEY="your-anthropic-api-key-here"
+   cat > .env <<'ENV'
+   OPENAI_API_KEY=replace-with-your-key
+   # Optional:
+   # ANTHROPIC_API_KEY=replace-with-your-key
+   # SECRET_KEY_BASE=provide-if-you-want-a-static-value
+   ENV
    ```
 
-2. **Run the deployment script**:
+2. Build and launch the stack:
+
    ```bash
-   ./deploy.sh
+   docker compose up --build
    ```
 
-3. **Access the application**:
-   - Open http://localhost:4000 in your browser
+   Compose builds the Phoenix release image (multi-stage) and the Chroma image, then starts both services.
 
-## Manual Deployment
+3. Visit [http://localhost:4000](http://localhost:4000) to use StudyBot.
 
-If you prefer manual deployment:
+## Common Commands
 
-1. **Copy environment file**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your API keys
-   ```
+```bash
+# View container status and health
+docker compose ps
 
-2. **Build and start**:
-   ```bash
-   docker compose build
-   docker compose up -d
-   ```
+# Follow logs for both services
+docker compose logs -f
 
-3. **Check status**:
-   ```bash
-   docker compose ps
-   docker compose logs -f
-   ```
+# Only Phoenix logs (includes LiveView output)
+docker compose logs -f study_bot
 
-## File Structure
+# Stop and remove containers
+docker compose down
 
-```
-├── Dockerfile                 # Multi-stage build for Phoenix + ChromaDB
-├── docker-compose.yml         # Service configuration
-├── supervisord.conf          # Process management for Phoenix + ChromaDB
-├── docker-entrypoint.sh      # Startup script with DB initialization
-├── deploy.sh                 # Automated deployment script
-├── .dockerignore             # Files to exclude from Docker context
-└── .env.example              # Environment variable template
+# Clean rebuild when dependencies change
+docker compose build --no-cache
 ```
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `OPENAI_API_KEY` | Yes | - | OpenAI API key for embeddings and chat |
-| `ANTHROPIC_API_KEY` | No | - | Anthropic API key (if using Anthropic provider) |
-| `SECRET_KEY_BASE` | No | auto-generated | Phoenix secret key |
-| `PHX_HOST` | No | localhost | Phoenix host |
-| `PORT` | No | 4000 | Phoenix port |
+`docker-compose.yml` loads `.env` automatically. Important keys:
 
-## Data Persistence
+| Variable | Required | Description |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Yes | Used for embeddings (and chat when using OpenAI provider) |
+| `ANTHROPIC_API_KEY` | No | Required only if Anthropic is selected at compile time |
+| `SECRET_KEY_BASE` | No | Generated automatically when omitted |
+| `PHX_HOST` | No | Defaults to `localhost`; used for origin checks |
+| `PORT` | No | Defaults to `4000` |
 
-- **SQLite Database**: `./data/study_bot.db`
-- **ChromaDB Data**: `./chroma_data/`
+## Service Details
 
-These directories are automatically created and mounted as Docker volumes.
+### study_bot (Phoenix)
+- Built from `Dockerfile`
+- Runs the release via `/app/bin/server`
+- Entry point (`docker-entrypoint.sh`) handles database migrations and runs the release as the `nobody` user
+- Health check hits `http://localhost:4000/health`
+- Mounts `./data` to `/app/data`
 
-## Container Services
-
-The container runs two services via supervisord:
-
-1. **ChromaDB**: Vector database on localhost:8000 (internal only)
-2. **Phoenix**: Web application on port 4000 (exposed)
+### chroma (ChromaDB)
+- Built from `Dockerfile.chroma`
+- Runs `chroma run --host 0.0.0.0 --port 8000`
+- Health check probes `http://localhost:8000/api/v2/heartbeat`
+- Mounts `./chroma_data` to `/chroma_data`
 
 ## Troubleshooting
 
-### Check service status:
-```bash
-docker compose ps
+- **Phoenix reports missing API key**: Confirm `OPENAI_API_KEY` is in `.env` and rebuild (`docker compose down && docker compose up --build`).
+- **Chroma unhealthy**: Ensure port 8000 is free and the health endpoint is reachable. Logs: `docker compose logs chroma`.
+- **Database issues**: Delete `./data/study_bot.db` and restart; migrations run automatically.
+- **Updating code**: After changes, rebuild Phoenix (`docker compose build study_bot`) so the release reflects updates.
+
+## Files of Interest
+
+```
+Dockerfile             # Phoenix release build
+Dockerfile.chroma      # Chroma image definition
+DOCKER_DEPLOYMENT.md   # This guide
+docker-compose.yml     # Service orchestration
+docker-entrypoint.sh   # Phoenix startup script
+supervisord.conf       # Legacy (unused) supervisor config retained for reference
 ```
 
-### View logs:
-```bash
-# All services
-docker compose logs -f
-
-# Phoenix only
-docker compose logs -f study_bot
-
-# ChromaDB specifically
-docker compose exec study_bot tail -f /var/log/supervisor/chromadb.out.log
-```
-
-### Restart services:
-```bash
-docker compose restart
-```
-
-### Clean rebuild:
-```bash
-docker compose down
-docker compose build --no-cache
-docker compose up -d
-```
-
-### Database issues:
-```bash
-# Reset database
-docker compose exec study_bot rm -f /app/data/study_bot.db
-docker compose restart
-```
-
-## Health Checks
-
-The container includes health checks that verify:
-- Phoenix server responds on port 4000
-- Application is ready to serve requests
-
-Check health status:
-```bash
-docker compose ps
-# Look for "healthy" status
-```
-
-## Performance Notes for M4 Mac
-
-- Uses Alpine Linux base image for smaller size
-- Multi-architecture support for ARM64
-- Optimized build layers for faster rebuilds
-- Persistent data volumes for faster restarts
-
-## Security Notes
-
-- ChromaDB port (8000) is not exposed outside the container
-- Only Phoenix port (4000) is accessible from host
-- Environment variables for sensitive data (API keys)
-- No root processes in production workload
+With the stack running, Phoenix and Chroma communicate over the internal Docker network, while only Phoenix is exposed to the host.

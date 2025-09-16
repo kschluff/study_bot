@@ -5,11 +5,6 @@ defmodule StudyBot.VectorStore do
 
   require Logger
 
-  @chroma_base_url Application.compile_env(
-                     :study_bot,
-                     [:chroma, :base_url],
-                     "http://localhost:8000"
-                   )
   @tenant "default_tenant"
   @database "default_database"
 
@@ -94,7 +89,7 @@ defmodule StudyBot.VectorStore do
 
   defp add_documents_to_collection_v2(collection_id, ids, embeddings, metadatas, documents) do
     url =
-      "#{@chroma_base_url}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections/#{collection_id}/add"
+      "#{chroma_base_url()}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections/#{collection_id}/add"
 
     payload = %{
       ids: Enum.reverse(ids),
@@ -119,7 +114,7 @@ defmodule StudyBot.VectorStore do
   end
 
   defp ensure_tenant_exists do
-    url = "#{@chroma_base_url}/api/v2/tenants"
+    url = "#{chroma_base_url()}/api/v2/tenants"
 
     case Req.post(url, json: %{name: @tenant}) do
       {:ok, %{status: status}} when status in 200..299 ->
@@ -140,7 +135,7 @@ defmodule StudyBot.VectorStore do
   end
 
   defp ensure_database_exists do
-    url = "#{@chroma_base_url}/api/v2/tenants/#{@tenant}/databases"
+    url = "#{chroma_base_url()}/api/v2/tenants/#{@tenant}/databases"
 
     case Req.post(url, json: %{name: @database}) do
       {:ok, %{status: status}} when status in 200..299 ->
@@ -161,7 +156,7 @@ defmodule StudyBot.VectorStore do
   end
 
   defp create_collection_v2(collection_name, course_id) do
-    url = "#{@chroma_base_url}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections"
+    url = "#{chroma_base_url()}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections"
 
     case Req.post(url,
            json: %{
@@ -184,7 +179,7 @@ defmodule StudyBot.VectorStore do
   end
 
   defp get_collection_id(collection_name) do
-    url = "#{@chroma_base_url}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections"
+    url = "#{chroma_base_url()}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections"
 
     case Req.get(url) do
       {:ok, %{status: status, body: collections}} when status in 200..299 ->
@@ -212,7 +207,7 @@ defmodule StudyBot.VectorStore do
     case get_collection_id(collection_name) do
       {:ok, collection_id} ->
         url =
-          "#{@chroma_base_url}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections/#{collection_id}/query"
+          "#{chroma_base_url()}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections/#{collection_id}/query"
 
         case Req.post(url,
                json: %{
@@ -248,7 +243,7 @@ defmodule StudyBot.VectorStore do
     case get_collection_id(collection_name) do
       {:ok, collection_id} ->
         url =
-          "#{@chroma_base_url}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections/#{collection_id}/delete"
+          "#{chroma_base_url()}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections/#{collection_id}/delete"
 
         case Req.post(url,
                json: %{
@@ -281,7 +276,7 @@ defmodule StudyBot.VectorStore do
     case get_collection_id(collection_name) do
       {:ok, collection_id} ->
         url =
-          "#{@chroma_base_url}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections/#{collection_id}"
+          "#{chroma_base_url()}/api/v2/tenants/#{@tenant}/databases/#{@database}/collections/#{collection_id}"
 
         case Req.delete(url) do
           {:ok, %{status: status}} when status in 200..299 ->
@@ -299,6 +294,12 @@ defmodule StudyBot.VectorStore do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp chroma_base_url do
+    :study_bot
+    |> Application.get_env(:chroma, [])
+    |> Keyword.get(:base_url, "http://localhost:8000")
   end
 
   defp collection_name_for_course(course_id) do

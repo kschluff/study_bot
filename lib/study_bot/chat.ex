@@ -4,7 +4,8 @@ defmodule StudyBot.Chat do
   """
 
   import Ecto.Query, warn: false
-  alias StudyBot.Repo
+  require Logger
+  alias StudyBot.{Repo, Text}
   alias StudyBot.Chat.ChatSession
 
   def list_sessions(course_id) do
@@ -26,8 +27,10 @@ defmodule StudyBot.Chat do
   end
 
   def add_message(%ChatSession{} = session, message) do
+    sanitized_message = sanitize_message(message)
+
     session
-    |> ChatSession.add_message_changeset(message)
+    |> ChatSession.add_message_changeset(sanitized_message)
     |> Repo.update()
   end
 
@@ -35,7 +38,7 @@ defmodule StudyBot.Chat do
 
   def get_messages(%ChatSession{messages: messages_json}) do
     case Jason.decode(messages_json) do
-      {:ok, messages} -> messages
+      {:ok, messages} -> Enum.map(messages, &sanitize_message/1)
       {:error, _} -> []
     end
   end
@@ -49,4 +52,18 @@ defmodule StudyBot.Chat do
     |> ChatSession.changeset(%{active: false})
     |> Repo.update()
   end
+
+  defp sanitize_message(%{"content" => content} = message) when is_binary(content) do
+    sanitized = Text.sanitize(content)
+
+    if sanitized != content do
+      Logger.warning("Sanitized message content in Chat.add_message",
+        original_hex: Base.encode16(content, case: :lower)
+      )
+    end
+
+    Map.put(message, "content", sanitized)
+  end
+
+  defp sanitize_message(message), do: message
 end

@@ -25,6 +25,7 @@ defmodule StudyBotWeb.Router do
 
     get "/courses/:course_id/documents/:id/download", DocumentController, :download
     post "/tts/generate", TTSController, :generate
+    get "/health", HealthController, :index
   end
 
   # Other scopes may use custom stacks.

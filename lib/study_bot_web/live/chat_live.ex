@@ -1,7 +1,7 @@
 defmodule StudyBotWeb.ChatLive do
   use StudyBotWeb, :live_view
 
-  alias StudyBot.{Courses, Chat, RAG}
+  alias StudyBot.{Courses, Chat, RAG, Text}
 
   @impl true
   def mount(%{"id" => course_id}, _session, socket) do
@@ -46,7 +46,7 @@ defmodule StudyBotWeb.ChatLive do
     # Add user message to UI immediately
     user_message = %{
       "role" => "user",
-      "content" => String.trim(query),
+      "content" => query |> String.trim() |> Text.sanitize(),
       "timestamp" => DateTime.utc_now()
     }
 
@@ -131,7 +131,7 @@ defmodule StudyBotWeb.ChatLive do
 
         assistant_message = %{
           "role" => "assistant",
-          "content" => response_with_indicator,
+          "content" => Text.sanitize(response_with_indicator),
           "timestamp" => DateTime.utc_now(),
           "source" => to_string(source)
         }
@@ -148,7 +148,7 @@ defmodule StudyBotWeb.ChatLive do
       {:error, reason} ->
         error_message = %{
           "role" => "assistant",
-          "content" => "❌ Sorry, I encountered an error: #{reason}",
+          "content" => Text.sanitize("❌ Sorry, I encountered an error: #{reason}"),
           "timestamp" => DateTime.utc_now(),
           "source" => "error"
         }
@@ -371,7 +371,6 @@ defmodule StudyBotWeb.ChatLive do
     </Layouts.app_full_width>
     """
   end
-
 
   defp strip_indicators(content) do
     content

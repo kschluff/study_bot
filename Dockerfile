@@ -20,9 +20,9 @@ ARG RUNNER_IMAGE="docker.io/debian:${DEBIAN_VERSION}"
 
 FROM ${BUILDER_IMAGE} AS builder
 
-# install build dependencies including Node.js for assets
+# install build dependencies
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends build-essential git nodejs npm \
+  && apt-get install -y --no-install-recommends build-essential git \
   && rm -rf /var/lib/apt/lists/*
 
 # prepare build dir
@@ -71,8 +71,16 @@ RUN mix release
 FROM ${RUNNER_IMAGE} AS final
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses5 locales ca-certificates \
-     python3 python3-pip sqlite3 poppler-utils supervisor wget curl \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    gosu \
+    libncurses5 \
+    libsqlite3-0 \
+    libstdc++6 \
+    locales \
+    poppler-utils \
+    wget \
   && rm -rf /var/lib/apt/lists/*
 
 # Set the locale
@@ -83,22 +91,8 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
-# Install ChromaDB (with compatible NumPy version)
-RUN pip3 install --no-cache-dir --break-system-packages chromadb==1.0.20
-
-# Set environment variables for your app
-ENV PORT=4000
-ENV PHX_SERVER=true
-ENV CHROMA_HOST=localhost
-ENV CHROMA_PORT=8000
-
 WORKDIR "/app"
-
-# Create directories for data and logs
-RUN mkdir -p /app/data /app/chroma_data /var/log/supervisor && \
-    chmod 755 /app/data /app/chroma_data
-
-RUN chown -R nobody:nogroup /app
+RUN chown nobody:nogroup /app
 
 # set runner ENV
 ENV MIX_ENV="prod"
@@ -106,18 +100,8 @@ ENV MIX_ENV="prod"
 # Only copy the final release from the build stage
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/study_bot ./
 
-# Copy configuration files (if they exist)
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 RUN chmod +x /app/docker-entrypoint.sh
 
-# Expose Phoenix port
-EXPOSE 4000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
-
-# Set entrypoint (run as root initially to handle database setup, then switch to nobody)
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/app/bin/server"]

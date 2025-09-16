@@ -1,6 +1,7 @@
 defmodule StudyBot.Chat.ChatSession do
   use Ecto.Schema
   import Ecto.Changeset
+  require Logger
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -32,8 +33,12 @@ defmodule StudyBot.Chat.ChatSession do
   end
 
   def add_message_changeset(session, message) do
-    current_messages = decode_messages(session.messages)
-    updated_messages = current_messages ++ [message]
+    current_messages =
+      session.messages
+      |> decode_messages()
+      |> Enum.map(&sanitize_message/1)
+
+    updated_messages = current_messages ++ [sanitize_message(message)]
 
     change(session, %{
       messages: Jason.encode!(updated_messages),
@@ -67,4 +72,18 @@ defmodule StudyBot.Chat.ChatSession do
   end
 
   defp generate_title_if_needed(existing_title, _), do: existing_title
+
+  defp sanitize_message(%{"content" => content} = message) when is_binary(content) do
+    sanitized = StudyBot.Text.sanitize(content)
+
+    if sanitized != content do
+      Logger.warning("Sanitized message content in ChatSession",
+        original_hex: Base.encode16(content, case: :lower)
+      )
+    end
+
+    Map.put(message, "content", sanitized)
+  end
+
+  defp sanitize_message(message), do: message
 end

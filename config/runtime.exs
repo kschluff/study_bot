@@ -1,5 +1,13 @@
 import Config
 
+config :study_bot, :chroma, base_url: System.get_env("CHROMA_BASE_URL") || "http://localhost:8000"
+
+config :study_bot,
+  openai_api_key: System.get_env("OPENAI_API_KEY"),
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY")
+
+config :openai, api_key: System.get_env("OPENAI_API_KEY")
+
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration
@@ -59,6 +67,7 @@ if config_env() == :prod do
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port
     ],
+    check_origin: ["//#{host}", "//localhost"],
     secret_key_base: secret_key_base
 
   # ## SSL Support
