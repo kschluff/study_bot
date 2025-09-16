@@ -102,7 +102,7 @@ defmodule StudyBotWeb.CoursesLive do
 
             <%= if @live_action == :new do %>
               <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
-                <h3 class="text-xl font-semibold mb-6">Create New Course</h3>
+                <h3 class="text-xl font-semibold text-gray-800 mb-6">Create New Course</h3>
 
                 <.form
                   for={@form}
