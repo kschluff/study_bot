@@ -19,7 +19,7 @@ defmodule StudyBotWeb.DocumentsLive do
          |> assign(:uploaded_files, [])
          |> assign(:page_title, "Documents - #{course.name}")
          |> allow_upload(:documents,
-           accept: ~w(.txt .pdf),
+           accept: ~w(.txt .pdf .docx .pptx),
            max_entries: 5,
            max_file_size: Application.get_env(:study_bot, :max_file_size, 50_000_000)
          )}
@@ -216,7 +216,7 @@ defmodule StudyBotWeb.DocumentsLive do
                         Drop files here or click to browse
                       </p>
                       <p class="text-sm text-gray-500">
-                        Supports: PDF, TXT files (max 50MB each, up to 5 files)
+                        Supports: PDF, TXT, Word (.docx), PowerPoint (.pptx) files (max 50MB each, up to 5 files)
                       </p>
                     </div>
 
@@ -413,6 +413,8 @@ defmodule StudyBotWeb.DocumentsLive do
   end
 
   defp document_icon("pdf"), do: "hero-document-text"
+  defp document_icon("docx"), do: "hero-document-text"
+  defp document_icon("pptx"), do: "hero-presentation-chart-bar"
   defp document_icon(_), do: "hero-document"
 
   defp format_file_size(size) when size < 1024, do: "#{size} B"

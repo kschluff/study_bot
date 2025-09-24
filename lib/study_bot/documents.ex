@@ -291,9 +291,19 @@ defmodule StudyBot.Documents do
     _ -> {:error, "pdftotext command not found or failed. Please install poppler-utils"}
   end
 
+  defp extract_text_content(file_path, "docx") do
+    extract_docx_text(file_path)
+  end
+
+  defp extract_text_content(file_path, "pptx") do
+    extract_pptx_text(file_path)
+  end
+
   defp determine_file_type(filename) do
     case Path.extname(filename) |> String.downcase() do
       ".pdf" -> "pdf"
+      ".docx" -> "docx"
+      ".pptx" -> "pptx"
       _ -> "text"
     end
   end
@@ -303,6 +313,121 @@ defmodule StudyBot.Documents do
     extension = Path.extname(original_filename)
     base_name = Path.basename(original_filename, extension)
     "#{timestamp}_#{base_name}#{extension}"
+  end
+
+  # Office document text extraction
+
+  defp extract_docx_text(file_path) do
+    zip_file = Unzip.LocalFile.open(file_path)
+
+    case Unzip.new(zip_file) do
+      {:ok, unzip} ->
+        case find_and_read_document_xml(unzip) do
+          {:ok, xml_content} ->
+            text = extract_text_from_docx_xml(xml_content)
+            {:ok, String.trim(text)}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, "Failed to read DOCX: #{reason}"}
+    end
+  rescue
+    e -> {:error, "DOCX extraction failed: #{inspect(e)}"}
+  end
+
+  defp extract_pptx_text(file_path) do
+    zip_file = Unzip.LocalFile.open(file_path)
+
+    case Unzip.new(zip_file) do
+      {:ok, unzip} ->
+        slide_texts = extract_text_from_pptx_slides_new(unzip)
+        text = Enum.join(slide_texts, "\n\n")
+        {:ok, String.trim(text)}
+
+      {:error, reason} ->
+        {:error, "Failed to read PPTX: #{reason}"}
+    end
+  rescue
+    e -> {:error, "PPTX extraction failed: #{inspect(e)}"}
+  end
+
+  defp find_and_read_document_xml(unzip) do
+    entries = Unzip.list_entries(unzip)
+
+    case Enum.find(entries, fn entry ->
+           String.ends_with?(entry.file_name, "word/document.xml")
+         end) do
+      %{file_name: filename} ->
+        stream = Unzip.file_stream!(unzip, filename)
+        content = Enum.join(stream)
+        {:ok, content}
+
+      nil ->
+        {:error, "document.xml not found in DOCX file"}
+    end
+  end
+
+  defp extract_text_from_docx_xml(xml_content) do
+    # Simple text extraction - find all <w:t> elements
+    xml_content
+    |> String.split(~r/<w:t[^>]*>/)
+    # Remove the part before first <w:t>
+    |> Enum.drop(1)
+    |> Enum.map(fn part ->
+      case String.split(part, "</w:t>", parts: 2) do
+        [text, _] -> decode_xml_entities(text)
+        _ -> ""
+      end
+    end)
+    |> Enum.join("")
+    |> String.replace(~r/\s+/, " ")
+  end
+
+  defp extract_text_from_pptx_slides_new(unzip) do
+    entries = Unzip.list_entries(unzip)
+
+    slides =
+      entries
+      |> Enum.filter(fn entry ->
+        String.contains?(entry.file_name, "ppt/slides/slide") &&
+          String.ends_with?(entry.file_name, ".xml")
+      end)
+      |> Enum.sort_by(fn entry -> entry.file_name end)
+
+    Enum.map(slides, fn entry ->
+      stream = Unzip.file_stream!(unzip, entry.file_name)
+      content = Enum.join(stream)
+      extract_text_from_slide_xml(content)
+    end)
+  end
+
+  defp extract_text_from_slide_xml(xml_content) do
+    # Extract text from <a:t> elements in slides
+    xml_content
+    |> String.split(~r/<a:t[^>]*>/)
+    # Remove the part before first <a:t>
+    |> Enum.drop(1)
+    |> Enum.map(fn part ->
+      case String.split(part, "</a:t>", parts: 2) do
+        [text, _] -> decode_xml_entities(text)
+        _ -> ""
+      end
+    end)
+    |> Enum.join(" ")
+    |> String.replace(~r/\s+/, " ")
+    |> String.trim()
+  end
+
+  defp decode_xml_entities(text) do
+    text
+    |> String.replace("&lt;", "<")
+    |> String.replace("&gt;", ">")
+    |> String.replace("&quot;", "\"")
+    |> String.replace("&apos;", "'")
+    |> String.replace("&amp;", "&")
   end
 
   # PubSub broadcast helper
