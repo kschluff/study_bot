@@ -48,7 +48,7 @@ defmodule StudyBot.Documents.Document do
     ])
     |> validate_required([:course_id, :filename, :original_filename, :file_type, :file_size])
     |> validate_inclusion(:status, ["pending", "processing", "processed", "failed"])
-    |> validate_inclusion(:file_type, ["text", "pdf"])
+    |> validate_inclusion(:file_type, ["text", "pdf", "docx", "pptx"])
     |> validate_number(:file_size, greater_than: 0)
     |> assoc_constraint(:course)
   end

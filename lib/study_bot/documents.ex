@@ -318,16 +318,32 @@ defmodule StudyBot.Documents do
   # Office document text extraction
 
   defp extract_docx_text(file_path) do
-    case Docxelixir.read_paragraphs(file_path) do
-      {:error, reason} ->
-        {:error, "DOCX extraction failed: #{reason}"}
+    # Check if file exists first
+    unless File.exists?(file_path) do
+      {:error, "DOCX file not found at #{file_path}"}
+    else
+      # Get file info for debugging
+      file_stat = File.stat!(file_path)
+      Logger.info("Processing DOCX file: #{file_path}, size: #{file_stat.size} bytes")
 
-      paragraphs when is_list(paragraphs) ->
-        text = Enum.join(paragraphs, "\n\n")
-        {:ok, String.trim(text)}
+      # Convert file path to charlist as required by Erlang's :zip module
+      charlist_path = String.to_charlist(file_path)
+
+      case Docxelixir.read_paragraphs(charlist_path) do
+        {:error, reason} ->
+          Logger.error("DOCX extraction failed for #{file_path}: #{reason}")
+          {:error, "DOCX extraction failed: #{reason}"}
+
+        paragraphs when is_list(paragraphs) ->
+          text = Enum.join(paragraphs, "\n\n")
+          Logger.info("Successfully extracted #{length(paragraphs)} paragraphs from DOCX")
+          {:ok, String.trim(text)}
+      end
     end
   rescue
-    e -> {:error, "DOCX extraction failed: #{inspect(e)}"}
+    e ->
+      Logger.error("DOCX extraction exception for #{file_path}: #{inspect(e)}")
+      {:error, "DOCX extraction failed: #{inspect(e)}"}
   end
 
   defp extract_pptx_text(file_path) do
