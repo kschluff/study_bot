@@ -318,21 +318,13 @@ defmodule StudyBot.Documents do
   # Office document text extraction
 
   defp extract_docx_text(file_path) do
-    zip_file = Unzip.LocalFile.open(file_path)
-
-    case Unzip.new(zip_file) do
-      {:ok, unzip} ->
-        case find_and_read_document_xml(unzip) do
-          {:ok, xml_content} ->
-            text = extract_text_from_docx_xml(xml_content)
-            {:ok, String.trim(text)}
-
-          {:error, reason} ->
-            {:error, reason}
-        end
-
+    case Docxelixir.read_paragraphs(file_path) do
       {:error, reason} ->
-        {:error, "Failed to read DOCX: #{reason}"}
+        {:error, "DOCX extraction failed: #{reason}"}
+
+      paragraphs when is_list(paragraphs) ->
+        text = Enum.join(paragraphs, "\n\n")
+        {:ok, String.trim(text)}
     end
   rescue
     e -> {:error, "DOCX extraction failed: #{inspect(e)}"}
@@ -352,38 +344,6 @@ defmodule StudyBot.Documents do
     end
   rescue
     e -> {:error, "PPTX extraction failed: #{inspect(e)}"}
-  end
-
-  defp find_and_read_document_xml(unzip) do
-    entries = Unzip.list_entries(unzip)
-
-    case Enum.find(entries, fn entry ->
-           String.ends_with?(entry.file_name, "word/document.xml")
-         end) do
-      %{file_name: filename} ->
-        stream = Unzip.file_stream!(unzip, filename)
-        content = Enum.join(stream)
-        {:ok, content}
-
-      nil ->
-        {:error, "document.xml not found in DOCX file"}
-    end
-  end
-
-  defp extract_text_from_docx_xml(xml_content) do
-    # Simple text extraction - find all <w:t> elements
-    xml_content
-    |> String.split(~r/<w:t[^>]*>/)
-    # Remove the part before first <w:t>
-    |> Enum.drop(1)
-    |> Enum.map(fn part ->
-      case String.split(part, "</w:t>", parts: 2) do
-        [text, _] -> decode_xml_entities(text)
-        _ -> ""
-      end
-    end)
-    |> Enum.join("")
-    |> String.replace(~r/\s+/, " ")
   end
 
   defp extract_text_from_pptx_slides_new(unzip) do

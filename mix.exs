@@ -73,6 +73,7 @@ defmodule StudyBot.MixProject do
       # File processing
       {:temp, "~> 0.4"},
       {:unzip, "~> 0.12"},
+      {:docxelixir, "~> 1.0"},
       # UUID generation
       {:uuid, "~> 1.1"}
     ]
