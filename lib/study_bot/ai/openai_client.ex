@@ -7,14 +7,12 @@ defmodule StudyBot.AI.OpenAIClient do
 
   require Logger
 
-  @embedding_model "text-embedding-ada-002"
   @embedding_dimensions 1536
-  #  @chat_model "gpt-3.5-turbo"
-  @chat_model "gpt-5-mini"
 
   @impl true
   def chat_completion(messages, opts \\ %{}) do
-    model = Map.get(opts, :model, @chat_model)
+    default_model = Application.get_env(:study_bot, :openai_chat_model, "gpt-4")
+    model = Map.get(opts, :model, default_model)
     # GPT-5 models use reasoning tokens, so need more total tokens
     default_tokens = if String.starts_with?(model, "gpt-5"), do: 5000, else: 500
     max_tokens = Map.get(opts, :max_tokens, default_tokens)
@@ -85,8 +83,11 @@ defmodule StudyBot.AI.OpenAIClient do
   def generate_embedding(text) do
     api_key = Application.get_env(:study_bot, :openai_api_key)
 
+    embedding_model =
+      Application.get_env(:study_bot, :openai_embedding_model, "text-embedding-ada-002")
+
     case OpenAI.embeddings(
-           [model: @embedding_model, input: text],
+           [model: embedding_model, input: text],
            %{
              api_key: api_key,
              organization_key: nil,
@@ -104,14 +105,16 @@ defmodule StudyBot.AI.OpenAIClient do
   end
 
   @impl true
-  def get_embedding_model, do: @embedding_model
+  def get_embedding_model,
+    do: Application.get_env(:study_bot, :openai_embedding_model, "text-embedding-ada-002")
 
   @impl true
   def get_embedding_dimensions, do: @embedding_dimensions
 
   @impl true
   def text_to_speech(text, opts \\ %{}) do
-    model = Map.get(opts, :model, "tts-1")
+    default_tts_model = Application.get_env(:study_bot, :openai_tts_model, "tts-1")
+    model = Map.get(opts, :model, default_tts_model)
     voice = Map.get(opts, :voice, "alloy")
     response_format = Map.get(opts, :response_format, "mp3")
     speed = Map.get(opts, :speed, 1.0)

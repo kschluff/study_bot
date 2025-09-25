@@ -67,6 +67,12 @@ config :study_bot,
   # API Keys
   openai_api_key: nil,
   anthropic_api_key: nil,
+  # AI Model Configuration
+#  openai_chat_model: "gpt-5-mini",
+  openai_chat_model: "gpt-5",
+  openai_embedding_model: "text-embedding-ada-002",
+  openai_tts_model: "tts-1",
+  anthropic_chat_model: "claude-3-haiku-20240307",
   # File upload configuration
   # 50MB in bytes
   max_file_size: 50_000_000

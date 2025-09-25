@@ -9,13 +9,14 @@ defmodule StudyBot.AI.AnthropicClient do
   require Logger
 
   # For embeddings, we still use OpenAI since Anthropic doesn't provide embeddings
-  @embedding_model "text-embedding-ada-002"
   @embedding_dimensions 1536
-  @chat_model "claude-3-haiku-20240307"
 
   @impl true
   def chat_completion(messages, opts \\ %{}) do
-    model = Map.get(opts, :model, @chat_model)
+    default_model =
+      Application.get_env(:study_bot, :anthropic_chat_model, "claude-3-haiku-20240307")
+
+    model = Map.get(opts, :model, default_model)
     max_tokens = Map.get(opts, :max_tokens, 500)
     temperature = Map.get(opts, :temperature, 0.7)
 
@@ -48,8 +49,11 @@ defmodule StudyBot.AI.AnthropicClient do
   @impl true
   def generate_embedding(text) do
     # Use OpenAI for embeddings since Anthropic doesn't provide embedding models
+    embedding_model =
+      Application.get_env(:study_bot, :openai_embedding_model, "text-embedding-ada-002")
+
     case openai_client().embeddings(
-           model: @embedding_model,
+           model: embedding_model,
            input: text
          ) do
       {:ok, %{data: [%{embedding: vector} | _]}} ->
@@ -62,7 +66,8 @@ defmodule StudyBot.AI.AnthropicClient do
   end
 
   @impl true
-  def get_embedding_model, do: @embedding_model
+  def get_embedding_model,
+    do: Application.get_env(:study_bot, :openai_embedding_model, "text-embedding-ada-002")
 
   @impl true
   def get_embedding_dimensions, do: @embedding_dimensions
