@@ -13,7 +13,8 @@ defmodule StudyBot.Documents.DocumentChunk do
              :document_id,
              :course_id,
              :inserted_at,
-             :updated_at
+             :updated_at,
+             :page_number
            ]}
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -24,6 +25,7 @@ defmodule StudyBot.Documents.DocumentChunk do
     field :token_count, :integer
     field :start_char, :integer
     field :end_char, :integer
+    field :page_number, :integer
 
     belongs_to :document, StudyBot.Documents.Document
     belongs_to :course, StudyBot.Courses.Course
@@ -40,7 +42,8 @@ defmodule StudyBot.Documents.DocumentChunk do
       :content,
       :token_count,
       :start_char,
-      :end_char
+      :end_char,
+      :page_number
     ])
     |> validate_required([:document_id, :course_id, :chunk_index, :content])
     |> validate_number(:chunk_index, greater_than_or_equal_to: 0)

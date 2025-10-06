@@ -193,7 +193,7 @@ defmodule StudyBot.RAG do
     context = build_context_from_chunks(chunks)
 
     system_prompt = """
-    You are a helpful study assistant for the course "#{course_name}".  
+    You are a helpful study assistant for the course "#{course_name}".
 
     You are an insightful, encouraging tutor who combines meticulous clarity with genuine enthusiasm and gentle humor.
 
@@ -207,12 +207,14 @@ defmodule StudyBot.RAG do
 
     Adaptive teaching: Flexibly adjust explanations based on perceived user proficiency.
 
-    Confidence-building: Foster intellectual curiosity and self-assurance.    
+    Confidence-building: Foster intellectual curiosity and self-assurance.
 
-    If the context doesn't contain enough information to answer the question, 
+    If the context doesn't contain enough information to answer the question,
     say so clearly and provide what information you can.
 
     Consider the conversation history when answering. Reference previous questions and answers when relevant to provide continuity and build upon earlier explanations.
+
+    IMPORTANT: When referencing information from the sources, include inline citations in APA format. Use the source number and page information provided in the context. For example: "According to the text (Source 1, p. 45)..." or "Research shows that (Source 2, pp. 12-15)..." Include these inline citations throughout your answer wherever you reference specific information from the sources.
 
     Context from course materials:
     #{context}
@@ -302,7 +304,14 @@ defmodule StudyBot.RAG do
               "Unknown Document"
           end
 
-        "Source #{index} (#{document_name}):\n#{String.trim(chunk.content)}\n"
+        # Include page number if available
+        page_info =
+          case Map.get(chunk, :page_number) do
+            nil -> ""
+            page -> ", p. #{page}"
+          end
+
+        "Source #{index} (#{document_name}#{page_info}):\n#{String.trim(chunk.content)}\n"
       end)
       |> Enum.join("\n---\n\n")
 
@@ -311,23 +320,11 @@ defmodule StudyBot.RAG do
   end
 
   defp build_citation_list(chunks) do
-    # Group chunks by document and collect unique documents with their source numbers
+    # Group chunks by document and collect page numbers and source numbers
     documents_with_sources =
       chunks
       |> Enum.with_index(1)
       |> Enum.reduce(%{}, fn {chunk, index}, acc ->
-        document_name =
-          case chunk do
-            %{document: %{original_filename: filename}} when is_binary(filename) ->
-              filename
-
-            %{document_id: doc_id} when is_binary(doc_id) ->
-              "Document #{String.slice(doc_id, 0, 8)}"
-
-            _ ->
-              "Unknown Document"
-          end
-
         document_id =
           case chunk do
             %{document: %{id: id}} -> id
@@ -335,17 +332,37 @@ defmodule StudyBot.RAG do
             _ -> "unknown"
           end
 
-        # Track which sources reference each document
-        current_sources = Map.get(acc, document_id, %{name: document_name, sources: []})
-        updated_sources = %{current_sources | sources: [index | current_sources.sources]}
+        page_number = Map.get(chunk, :page_number)
+
+        document_info =
+          case chunk do
+            %{document: doc} when not is_nil(doc) -> doc
+            _ -> nil
+          end
+
+        # Track which sources reference each document and their page numbers
+        current =
+          Map.get(acc, document_id, %{
+            document: document_info,
+            sources: [],
+            pages: MapSet.new()
+          })
+
+        updated_sources = %{
+          current
+          | sources: [index | current.sources],
+            pages: if(page_number, do: MapSet.put(current.pages, page_number), else: current.pages)
+        }
 
         Map.put(acc, document_id, updated_sources)
       end)
 
-    # Build citation list with source ranges
+    # Build APA citation list
     citations =
       documents_with_sources
-      |> Enum.map(fn {_doc_id, %{name: document_name, sources: source_numbers}} ->
+      |> Enum.map(fn {_doc_id, %{document: doc, sources: source_numbers, pages: page_set}} ->
+        apa_citation = format_apa_citation(doc, page_set)
+
         sorted_sources = Enum.sort(source_numbers)
 
         source_range =
@@ -358,12 +375,42 @@ defmodule StudyBot.RAG do
               "Sources #{ranges}"
           end
 
-        "#{source_range}: #{document_name}"
+        "#{source_range}: #{apa_citation}"
       end)
       |> Enum.sort()
       |> Enum.join("\n")
 
     "**Sources:**\n#{citations}"
+  end
+
+  defp format_apa_citation(document, page_set) do
+    pages = page_set |> Enum.sort() |> Enum.join(", ")
+
+    case document do
+      %{author: author, title: title, publication_year: year, publisher: publisher}
+      when not is_nil(author) and not is_nil(title) and not is_nil(year) ->
+        # Full APA citation with all metadata
+        page_info = if pages != "", do: " (pp. #{pages})", else: ""
+        publisher_info = if publisher, do: " #{publisher}.", else: ""
+        "#{author} (#{year}). #{title}.#{publisher_info}#{page_info}"
+
+      %{author: author, title: title, publication_year: year} when not is_nil(title) ->
+        # Partial APA citation without publisher
+        page_info = if pages != "", do: " (pp. #{pages})", else: ""
+        author_info = if author, do: "#{author}. ", else: ""
+        year_info = if year, do: "(#{year}). ", else: ""
+        "#{author_info}#{year_info}#{title}#{page_info}"
+
+      %{original_filename: filename} when is_binary(filename) ->
+        # Fallback to filename
+        page_info = if pages != "", do: " (pp. #{pages})", else: ""
+        "#{filename}#{page_info}"
+
+      _ ->
+        # Ultimate fallback
+        page_info = if pages != "", do: " (pp. #{pages})", else: ""
+        "Unknown Document#{page_info}"
+    end
   end
 
   defp build_source_ranges(numbers) do

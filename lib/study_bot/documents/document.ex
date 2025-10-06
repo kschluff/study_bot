@@ -12,7 +12,11 @@ defmodule StudyBot.Documents.Document do
              :status,
              :processed_at,
              :inserted_at,
-             :updated_at
+             :updated_at,
+             :author,
+             :title,
+             :publication_year,
+             :publisher
            ]}
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -26,6 +30,12 @@ defmodule StudyBot.Documents.Document do
     field :status, :string, default: "pending"
     field :error_message, :string
     field :processed_at, :utc_datetime
+
+    # APA citation metadata
+    field :author, :string
+    field :title, :string
+    field :publication_year, :integer
+    field :publisher, :string
 
     belongs_to :course, StudyBot.Courses.Course
     has_many :document_chunks, StudyBot.Documents.DocumentChunk
@@ -44,7 +54,11 @@ defmodule StudyBot.Documents.Document do
       :content,
       :status,
       :error_message,
-      :processed_at
+      :processed_at,
+      :author,
+      :title,
+      :publication_year,
+      :publisher
     ])
     |> validate_required([:course_id, :filename, :original_filename, :file_type, :file_size])
     |> validate_inclusion(:status, ["pending", "processing", "processed", "failed"])
